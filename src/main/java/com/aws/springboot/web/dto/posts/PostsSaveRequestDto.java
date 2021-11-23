@@ -1,4 +1,4 @@
-package com.aws.springboot.web.dto;
+package com.aws.springboot.web.dto.posts;
 
 import com.aws.springboot.web.domain.posts.Posts;
 import lombok.Builder;
@@ -14,10 +14,10 @@ public class PostsSaveRequestDto {
     private String author;
 
     @Builder
-    public PostsSaveRequestDto(String title, String content, String athor) {
+    public PostsSaveRequestDto(String title, String content, String author) {
         this.title = title;
         this.content = content;
-        this.author = athor;
+        this.author = author;
     }
 
 
