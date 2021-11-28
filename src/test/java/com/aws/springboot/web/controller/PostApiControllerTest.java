@@ -4,20 +4,34 @@ import com.aws.springboot.web.domain.posts.Posts;
 import com.aws.springboot.web.domain.posts.PostsRepository;
 import com.aws.springboot.web.dto.posts.PostsSaveRequestDto;
 import com.aws.springboot.web.dto.posts.PostsUpdateRequestDto;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.*;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MockMvcBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(SpringExtension.class)
 //램덤 포트 사용설정. TestRestTemplate 주입을 위한 설정
@@ -30,16 +44,30 @@ public class PostApiControllerTest {
     @Autowired
     private PostsRepository postsRepository;
 
+    @Autowired
+    private WebApplicationContext context;
+
     @LocalServerPort
     private int port;
+
+    private MockMvc mvc;
+
+    @BeforeEach
+    public void beforeEach(){
+        mvc = MockMvcBuilders
+                .webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
+    }
 
     @AfterEach
     public void afterEach(){
         postsRepository.deleteAll();
     }
 
+    @WithMockUser(roles = "USER")
     @Test
-    public void posts_등록(){
+    public void posts_등록() throws Exception {
         //given
         String title = "test Title";
         String content = "test content";
@@ -52,11 +80,11 @@ public class PostApiControllerTest {
         String url = "http://localhost:" + port + "/api/v1/posts";
 
         //when
-        ResponseEntity<Long> entity = testRestTemplate.postForEntity(url, dto, Long.class);
-
+        mvc.perform(post(url)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content(new ObjectMapper().writeValueAsString(dto)))
+                .andExpect(status().isOk());
         //then
-        assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(entity.getBody()).isGreaterThan(0L);
 
         List<Posts> all = postsRepository.findAll();
         assertThat(all.get(0).getTitle()).isEqualTo(title);
@@ -65,7 +93,8 @@ public class PostApiControllerTest {
     }
 
     @Test
-    public void posts_수정(){
+    @WithMockUser(roles = "USER")
+    public void posts_수정() throws Exception {
 
         //given
         Posts posts = Posts.builder()
@@ -88,21 +117,18 @@ public class PostApiControllerTest {
 
         String url = "http://localhost:" + port + "/api/v1/posts/" + id;
 
-        HttpEntity<PostsUpdateRequestDto> httpEntity = new HttpEntity<>(requestDto);
+
 
         //when
 
-        ResponseEntity<Long> responseEntity = testRestTemplate.exchange(
-                url,
-                HttpMethod.PUT,
-                httpEntity,
-                Long.class );
+        mvc.perform(put(url)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(new ObjectMapper().writeValueAsString(requestDto)))
+                .andExpect(status().isOk());
+
 
 
         //then
-
-        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(responseEntity.getBody()).isGreaterThan(0L);
 
         List<Posts> list = postsRepository.findAll();
         assertThat(list.get(0).getTitle()).isEqualTo(updateTitle);
